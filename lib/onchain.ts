@@ -63,31 +63,10 @@ export async function logEvaluationOnchain(params: {
     const walletClient = getWalletClient();
 
     console.log("AgentGuard logger wallet address:", walletClient.account?.address);
-
-    // 🔍 Debug the address at runtime
-    console.log("AG logger address (raw):", agentGuardLoggerAddress);
-    console.log("Type:", typeof agentGuardLoggerAddress);
-
-    if (typeof agentGuardLoggerAddress !== "string") {
-      throw new Error(
-        "Onchain logging failed: agentGuardLoggerAddress is not a string at runtime"
-      );
-    }
-
-    const trimmed = agentGuardLoggerAddress.trim();
-    console.log("Trimmed address:", trimmed, "length:", trimmed.length);
-
-    const isValidFormat = /^0x[0-9a-fA-F]{40}$/.test(trimmed);
-    console.log("Regex valid?", isValidFormat);
-
-    if (!isValidFormat) {
-      throw new Error(
-        `Onchain logging failed: contract address has bad format: "${trimmed}"`
-      );
-    }
+    console.log("Contract address being used:", agentGuardLoggerAddress);
 
     const txHash = await walletClient.writeContract({
-      address: trimmed as `0x${string}`,
+      address: agentGuardLoggerAddress,
       abi: agentGuardLoggerAbi,
       functionName: "logEvaluation",
       args: [params.strategyId, params.marketId, params.allowed, params.reason],
