@@ -6,9 +6,11 @@ import {
   BASE_SEPOLIA_RPC_URL,
 } from "./config/onchainConfig";
 
-export const agentGuardLoggerAddress = AGENT_GUARD_LOGGER_ADDRESS;
+// Contract address (from Remix deployment)
+export const agentGuardLoggerAddress =
+  AGENT_GUARD_LOGGER_ADDRESS as `0x${string}`;
 
-// ✅ Corrected ABI: single array, TypeScript object syntax, no extra nesting
+// ABI copied from Remix artifacts (⚠️ single array, NOT nested)
 export const agentGuardLoggerAbi = [
   {
     anonymous: false,
@@ -83,6 +85,8 @@ export const agentGuardLoggerAbi = [
   },
 ] as const;
 
+// Temporary: hard-coded logging wallet private key
+// (totally fine for hackathon testnet, but don’t ship like this in prod)
 function getWalletClient() {
   const rpcUrl = BASE_SEPOLIA_RPC_URL;
   const privateKey =
@@ -115,15 +119,9 @@ export async function logEvaluationOnchain(params: {
       walletClient.account?.address
     );
     console.log("Contract address being used:", agentGuardLoggerAddress);
-
-    // ✅ ABI sanity check
-    console.log("Raw ABI at runtime:", agentGuardLoggerAbi);
-    console.log(
-      "ABI function names at runtime:",
-      Array.from(agentGuardLoggerAbi)
-        .filter((item: any) => item.type === "function")
-        .map((item: any) => item.name)
-    );
+    console.log("ABI has logEvaluation?:", agentGuardLoggerAbi.some(
+      (entry) => entry.type === "function" && entry.name === "logEvaluation"
+    ));
 
     const txHash = await walletClient.writeContract({
       address: agentGuardLoggerAddress,
