@@ -9,31 +9,79 @@ import {
 export const agentGuardLoggerAddress = AGENT_GUARD_LOGGER_ADDRESS;
 
 export const agentGuardLoggerAbi = [
-  {
-    type: "event",
-    name: "EvaluationLogged",
-    inputs: [
-      { name: "caller", type: "address", indexed: true },
-      { name: "strategyId", type: "string", indexed: false },
-      { name: "marketId", type: "string", indexed: false },
-      { name: "allowed", type: "bool", indexed: false },
-      { name: "reason", type: "string", indexed: false },
-      { name: "timestamp", type: "uint256", indexed: false },
-    ],
-    anonymous: false,
-  },
-  {
-    type: "function",
-    stateMutability: "nonpayable",
-    outputs: [],
-    name: "logEvaluation",
-    inputs: [
-      { name: "strategyId", type: "string" },
-      { name: "marketId", type: "string" },
-      { name: "allowed", type: "bool" },
-      { name: "reason", type: "string" },
-    ],
-  },
+  [
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "caller",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "strategyId",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "marketId",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "bool",
+				"name": "allowed",
+				"type": "bool"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "reason",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			}
+		],
+		"name": "EvaluationLogged",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "strategyId",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "marketId",
+				"type": "string"
+			},
+			{
+				"internalType": "bool",
+				"name": "allowed",
+				"type": "bool"
+			},
+			{
+				"internalType": "string",
+				"name": "reason",
+				"type": "string"
+			}
+		],
+		"name": "logEvaluation",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	}
+]
 ] as const;
 
 function getWalletClient() {
