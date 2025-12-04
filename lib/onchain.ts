@@ -120,7 +120,7 @@ export async function logEvaluationOnchain(params: {
     console.log("Raw ABI at runtime:", agentGuardLoggerAbi);
     console.log(
       "ABI function names at runtime:",
-      (agentGuardLoggerAbi as any[])
+      Array.from(agentGuardLoggerAbi)
         .filter((item: any) => item.type === "function")
         .map((item: any) => item.name)
     );
