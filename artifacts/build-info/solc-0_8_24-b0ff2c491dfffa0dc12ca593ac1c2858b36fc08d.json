@@ -1,0 +1,35 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_24-b0ff2c491dfffa0dc12ca593ac1c2858b36fc08d",
+  "solcVersion": "0.8.24",
+  "solcLongVersion": "0.8.24+commit.e11b9ed9",
+  "userSourceNameMap": {
+    "contracts/AgentSafeWallet.sol": "project/contracts/AgentSafeWallet.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "shanghai",
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/AgentSafeWallet.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.24;\n\ncontract AgentSafeWallet {\n    address public owner;\n    address public executor;\n\n    event ExecutorUpdated(address indexed newExecutor);\n    event TransferExecuted(address indexed to, uint256 amount);\n\n    modifier onlyOwner() {\n        require(msg.sender == owner, \"Only owner can call this\");\n        _;\n    }\n\n    modifier onlyExecutor() {\n        require(msg.sender == executor, \"Only executor can call this\");\n        _;\n    }\n\n    constructor(address _owner, address _executor) {\n        require(_owner != address(0), \"Owner cannot be zero address\");\n        require(_executor != address(0), \"Executor cannot be zero address\");\n        owner = _owner;\n        executor = _executor;\n    }\n\n    function setExecutor(address _executor) external onlyOwner {\n        require(_executor != address(0), \"Executor cannot be zero address\");\n        executor = _executor;\n        emit ExecutorUpdated(_executor);\n    }\n\n    function executeTransfer(address payable to, uint256 amount) external onlyExecutor {\n        require(to != address(0), \"Cannot transfer to zero address\");\n        require(address(this).balance >= amount, \"Insufficient balance\");\n\n        (bool success, ) = to.call{value: amount}(\"\");\n        require(success, \"Transfer failed\");\n\n        emit TransferExecuted(to, amount);\n    }\n\n    receive() external payable {}\n}\n"
+      }
+    }
+  }
+}
