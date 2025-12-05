@@ -50,3 +50,104 @@ export async function fetchPolymarketMarkets(): Promise<Market[]> {
     return MARKETS;
   }
 }
+
+// ==================== Polymarket Trading Executor ====================
+
+import { ClobClient, OrderType, Side, TickSize } from "@polymarket/clob-client";
+import { Wallet } from "@ethersproject/wallet";
+
+const POLY_HOST =
+  process.env.POLYMARKET_HOST ?? "https://clob.polymarket.com";
+const POLY_CHAIN_ID = 137; // Polygon mainnet
+
+const TRADING_ENABLED =
+  process.env.POLYMARKET_TRADING_ENABLED === "true";
+
+const FUNDER_ADDRESS = process.env.POLYMARKET_FUNDER_ADDRESS;
+const PRIVATE_KEY = process.env.POLYMARKET_PRIVATE_KEY;
+
+if (TRADING_ENABLED) {
+  if (!FUNDER_ADDRESS) {
+    console.warn("[Polymarket] FUNDER_ADDRESS missing; trading will fail");
+  }
+  if (!PRIVATE_KEY) {
+    console.warn("[Polymarket] PRIVATE_KEY missing; trading will fail");
+  }
+}
+
+let clobClientPromise: Promise<ClobClient> | null = null;
+
+async function getClobClient(): Promise<ClobClient> {
+  if (!TRADING_ENABLED) {
+    throw new Error("Polymarket trading disabled (POLYMARKET_TRADING_ENABLED!=true)");
+  }
+  if (!PRIVATE_KEY || !FUNDER_ADDRESS) {
+    throw new Error("Polymarket config missing PRIVATE_KEY or FUNDER_ADDRESS");
+  }
+
+  if (!clobClientPromise) {
+    const signer = new Wallet(PRIVATE_KEY);
+    const baseClient = new ClobClient(POLY_HOST, POLY_CHAIN_ID, signer);
+    const creds = await baseClient.createOrDeriveApiKey();
+
+    const signatureType = 1; // email/Magic-style auth per Polymarket docs
+
+    clobClientPromise = Promise.resolve(
+      new ClobClient(
+        POLY_HOST,
+        POLY_CHAIN_ID,
+        signer,
+        await creds,
+        signatureType,
+        FUNDER_ADDRESS
+      )
+    );
+  }
+
+  return clobClientPromise;
+}
+
+export type PolymarketSide = "BUY" | "SELL";
+
+export interface ExecutePolymarketOrderParams {
+  tokenId: string;
+  side: PolymarketSide;
+  price: number;
+  size: number;
+  tickSize: TickSize;
+  negRisk: boolean;
+}
+
+/**
+ * Execute a single Polymarket order on the CLOB.
+ */
+export async function executePolymarketOrder(
+  params: ExecutePolymarketOrderParams
+) {
+  const client = await getClobClient();
+
+  const sideEnum = params.side === "BUY" ? Side.BUY : Side.SELL;
+
+  console.log("[Polymarket] Executing order", {
+    tokenId: params.tokenId,
+    side: params.side,
+    price: params.price,
+    size: params.size,
+    tickSize: params.tickSize,
+    negRisk: params.negRisk,
+  });
+
+  const resp = await client.createAndPostOrder(
+    {
+      tokenID: params.tokenId,
+      price: params.price,
+      side: sideEnum,
+      size: params.size,
+    },
+    { tickSize: params.tickSize, negRisk: params.negRisk },
+    OrderType.GTC
+  );
+
+  console.log("[Polymarket] Order response:", resp);
+  return resp;
+}
