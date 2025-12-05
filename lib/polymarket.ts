@@ -55,22 +55,20 @@ export async function fetchPolymarketMarkets(): Promise<Market[]> {
 
 import { ClobClient, OrderType, Side, TickSize } from "@polymarket/clob-client";
 import { Wallet } from "@ethersproject/wallet";
+import {
+  POLYMARKET_TRADING_ENABLED,
+  POLYMARKET_TRADING_DRY_RUN,
+  POLYMARKET_HOST,
+  POLYMARKET_CHAIN_ID,
+  POLYMARKET_FUNDER_ADDRESS,
+  POLYMARKET_PRIVATE_KEY,
+} from "@/lib/config/polymarketConfig";
 
-const POLY_HOST =
-  process.env.POLYMARKET_HOST ?? "https://clob.polymarket.com";
-const POLY_CHAIN_ID = 137; // Polygon mainnet
-
-const TRADING_ENABLED =
-  process.env.POLYMARKET_TRADING_ENABLED === "true";
-
-const FUNDER_ADDRESS = process.env.POLYMARKET_FUNDER_ADDRESS;
-const PRIVATE_KEY = process.env.POLYMARKET_PRIVATE_KEY;
-
-if (TRADING_ENABLED) {
-  if (!FUNDER_ADDRESS) {
+if (POLYMARKET_TRADING_ENABLED) {
+  if (!POLYMARKET_FUNDER_ADDRESS) {
     console.warn("[Polymarket] FUNDER_ADDRESS missing; trading will fail");
   }
-  if (!PRIVATE_KEY) {
+  if (!POLYMARKET_PRIVATE_KEY) {
     console.warn("[Polymarket] PRIVATE_KEY missing; trading will fail");
   }
 }
@@ -78,28 +76,28 @@ if (TRADING_ENABLED) {
 let clobClientPromise: Promise<ClobClient> | null = null;
 
 async function getClobClient(): Promise<ClobClient> {
-  if (!TRADING_ENABLED) {
+  if (!POLYMARKET_TRADING_ENABLED) {
     throw new Error("Polymarket trading disabled (POLYMARKET_TRADING_ENABLED!=true)");
   }
-  if (!PRIVATE_KEY || !FUNDER_ADDRESS) {
+  if (!POLYMARKET_PRIVATE_KEY || !POLYMARKET_FUNDER_ADDRESS) {
     throw new Error("Polymarket config missing PRIVATE_KEY or FUNDER_ADDRESS");
   }
 
   if (!clobClientPromise) {
-    const signer = new Wallet(PRIVATE_KEY);
-    const baseClient = new ClobClient(POLY_HOST, POLY_CHAIN_ID, signer);
+    const signer = new Wallet(POLYMARKET_PRIVATE_KEY);
+    const baseClient = new ClobClient(POLYMARKET_HOST, POLYMARKET_CHAIN_ID, signer);
     const creds = await baseClient.createOrDeriveApiKey();
 
     const signatureType = 1; // email/Magic-style auth per Polymarket docs
 
     clobClientPromise = Promise.resolve(
       new ClobClient(
-        POLY_HOST,
-        POLY_CHAIN_ID,
+        POLYMARKET_HOST,
+        POLYMARKET_CHAIN_ID,
         signer,
         await creds,
         signatureType,
-        FUNDER_ADDRESS
+        POLYMARKET_FUNDER_ADDRESS
       )
     );
   }
@@ -118,36 +116,114 @@ export interface ExecutePolymarketOrderParams {
   negRisk: boolean;
 }
 
+export type PolymarketExecutionResult =
+  | {
+      executed: true;
+      dryRun: false;
+      orderId: string;
+      side: string;
+      size: number;
+      price: number;
+      tokenId: string;
+    }
+  | {
+      executed: false;
+      dryRun: true;
+      side: string;
+      size: number;
+      price: number;
+      tokenId: string;
+      reason: string;
+    }
+  | {
+      executed: false;
+      dryRun: false;
+      reason: string;
+    };
+
 /**
  * Execute a single Polymarket order on the CLOB.
  */
 export async function executePolymarketOrder(
   params: ExecutePolymarketOrderParams
-) {
-  const client = await getClobClient();
+): Promise<PolymarketExecutionResult> {
+  const { tokenId, side, price, size, tickSize, negRisk } = params;
 
-  const sideEnum = params.side === "BUY" ? Side.BUY : Side.SELL;
+  // Dry run mode: simulate order without sending
+  if (!POLYMARKET_TRADING_ENABLED && POLYMARKET_TRADING_DRY_RUN) {
+    console.log("[Polymarket] DRY RUN – would place order:", {
+      side,
+      size,
+      price,
+      tokenId,
+      tickSize,
+      negRisk,
+    });
 
-  console.log("[Polymarket] Executing order", {
-    tokenId: params.tokenId,
-    side: params.side,
-    price: params.price,
-    size: params.size,
-    tickSize: params.tickSize,
-    negRisk: params.negRisk,
-  });
+    return {
+      executed: false,
+      dryRun: true,
+      side,
+      size,
+      price,
+      tokenId,
+      reason: "Dry run mode – no order sent",
+    };
+  }
 
-  const resp = await client.createAndPostOrder(
-    {
-      tokenID: params.tokenId,
-      price: params.price,
-      side: sideEnum,
-      size: params.size,
-    },
-    { tickSize: params.tickSize, negRisk: params.negRisk },
-    OrderType.GTC
-  );
+  // Trading disabled and not in dry run mode
+  if (!POLYMARKET_TRADING_ENABLED && !POLYMARKET_TRADING_DRY_RUN) {
+    return {
+      executed: false,
+      dryRun: false,
+      reason: "Trading disabled",
+    };
+  }
 
-  console.log("[Polymarket] Order response:", resp);
-  return resp;
+  // Real trading mode
+  try {
+    const client = await getClobClient();
+    const sideEnum = side === "BUY" ? Side.BUY : Side.SELL;
+
+    console.log("[Polymarket] Executing order", {
+      tokenId,
+      side,
+      price,
+      size,
+      tickSize,
+      negRisk,
+    });
+
+    const resp = await client.createAndPostOrder(
+      {
+        tokenID: tokenId,
+        price,
+        side: sideEnum,
+        size,
+      },
+      { tickSize, negRisk },
+      OrderType.GTC
+    );
+
+    console.log("[Polymarket] Order response:", resp);
+
+    return {
+      executed: true,
+      dryRun: false,
+      orderId: resp.orderID || "unknown",
+      side,
+      size,
+      price,
+      tokenId,
+    };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    console.error("[Polymarket] Order execution failed:", errorMessage);
+
+    return {
+      executed: false,
+      dryRun: false,
+      reason: errorMessage,
+    };
+  }
 }

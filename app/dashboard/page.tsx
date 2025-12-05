@@ -18,6 +18,7 @@ export default function DashboardPage() {
   const [running, setRunning] = useState(false);
   const [loggingOnchain, setLoggingOnchain] = useState<Record<string, boolean>>({});
   const [loggedOnchain, setLoggedOnchain] = useState<Record<string, string>>({});
+  const [polymarketResults, setPolymarketResults] = useState<Record<string, any>>({});
   const { toast } = useToast();
 
   const fetchLogs = async () => {
@@ -118,11 +119,22 @@ export default function DashboardPage() {
 
       if (response.ok) {
         setLoggedOnchain((prev) => ({ ...prev, [log.id]: data.txHash }));
+        if (data.polymarket) {
+          setPolymarketResults((prev) => ({ ...prev, [log.id]: data.polymarket }));
+        }
+
+        const polymarketMsg = data.polymarket?.dryRun
+          ? `\nPolymarket: ${data.polymarket.side} ${data.polymarket.size} @ ${data.polymarket.price} (DRY RUN)`
+          : data.polymarket?.executed
+          ? `\nPolymarket: Order ${data.polymarket.orderId} executed`
+          : "";
+
         toast({
           title: "Logged on Base ✓",
           description: (
             <div className="space-y-1">
               <p>Transaction: {data.txHash.slice(0, 10)}...{data.txHash.slice(-8)}</p>
+              {polymarketMsg && <p className="text-xs">{polymarketMsg}</p>}
               <a
                 href={`https://sepolia.basescan.org/tx/${data.txHash}`}
                 target="_blank"
@@ -381,37 +393,58 @@ export default function DashboardPage() {
                           {log.result.reason}
                         </td>
                         <td className="py-3 px-4">
-                          {loggedOnchain[log.id] ? (
-                            <a
-                              href={`https://sepolia.basescan.org/tx/${loggedOnchain[log.id]}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-green-600 hover:underline flex items-center gap-1"
-                            >
-                              <CheckCircle className="h-3 w-3" />
-                              Logged ✓
-                            </a>
-                          ) : (
-                            <Button
-                              onClick={() => logOnBase(log)}
-                              disabled={loggingOnchain[log.id]}
-                              size="sm"
-                              variant="outline"
-                              className="text-xs h-8 border-blue-600 text-blue-600 hover:bg-blue-50"
-                            >
-                              {loggingOnchain[log.id] ? (
-                                <>
-                                  <RefreshCw className="mr-1 h-3 w-3 animate-spin" />
-                                  Logging...
-                                </>
-                              ) : (
-                                <>
-                                  <Link2 className="mr-1 h-3 w-3" />
-                                  Log on Base
-                                </>
-                              )}
-                            </Button>
-                          )}
+                          <div className="space-y-1">
+                            {loggedOnchain[log.id] ? (
+                              <>
+                                <a
+                                  href={`https://sepolia.basescan.org/tx/${loggedOnchain[log.id]}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-green-600 hover:underline flex items-center gap-1"
+                                >
+                                  <CheckCircle className="h-3 w-3" />
+                                  Logged ✓
+                                </a>
+                                {polymarketResults[log.id]?.dryRun && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="text-xs bg-amber-100 text-amber-800 hover:bg-amber-200"
+                                    title={`DRY RUN: ${polymarketResults[log.id].side} ${polymarketResults[log.id].size} @ ${polymarketResults[log.id].price} on token ${polymarketResults[log.id].tokenId.slice(0, 8)}...`}
+                                  >
+                                    Simulated Trade ✓
+                                  </Badge>
+                                )}
+                                {polymarketResults[log.id]?.executed && !polymarketResults[log.id]?.dryRun && (
+                                  <Badge
+                                    variant="default"
+                                    className="text-xs bg-green-100 text-green-800 hover:bg-green-200"
+                                  >
+                                    Traded on Polymarket ✓
+                                  </Badge>
+                                )}
+                              </>
+                            ) : (
+                              <Button
+                                onClick={() => logOnBase(log)}
+                                disabled={loggingOnchain[log.id]}
+                                size="sm"
+                                variant="outline"
+                                className="text-xs h-8 border-blue-600 text-blue-600 hover:bg-blue-50"
+                              >
+                                {loggingOnchain[log.id] ? (
+                                  <>
+                                    <RefreshCw className="mr-1 h-3 w-3 animate-spin" />
+                                    Logging...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Link2 className="mr-1 h-3 w-3" />
+                                    Log on Base
+                                  </>
+                                )}
+                              </Button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}

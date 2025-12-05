@@ -50,7 +50,14 @@ export async function POST(req: NextRequest) {
     console.error("Polymarket execution API error:", err);
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json(
-      { error: "Polymarket execution failed", details: msg },
+      {
+        ok: false,
+        result: {
+          executed: false,
+          dryRun: false,
+          reason: msg,
+        },
+      },
       { status: 500 }
     );
   }
